@@ -1,6 +1,9 @@
 from typing import Dict, Any, Optional
 import requests
 from .exceptions import AuthenticationError, ApiError
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Credentials:
     """Handles authentication and request credentials."""
@@ -49,9 +52,28 @@ class Credentials:
         path: str, 
         auth_required: bool = True,
         use_prod_api: bool = False,
+        timeout: int = 30,
         **kwargs
     ) -> Dict[str, Any]:
-        """Make an authenticated API request."""
+        """
+        Make an authenticated API request.
+        
+        Args:
+            method: HTTP method
+            path: API endpoint path
+            auth_required: Whether authentication is required
+            use_prod_api: Whether to use production API base URL
+            timeout: Request timeout in seconds
+            **kwargs: Additional request parameters
+            
+        Returns:
+            Dict containing API response
+            
+        Raises:
+            AuthenticationError: If authentication is required but not authenticated
+            ApiError: If API request fails
+            requests.exceptions.RequestException: If request fails
+        """
         if auth_required and not self.is_authenticated:
             raise AuthenticationError("Authentication required")
             
@@ -63,11 +85,15 @@ class Credentials:
             headers["Authorization"] = f"Bearer {self._token}"
             kwargs["headers"] = headers
             
-        response = requests.request(method, url, **kwargs)
-        response.raise_for_status()
-        data = response.json()
-        
-        if not data.get("success"):
-            raise ApiError(data.get("message", "Unknown API error"))
+        try:
+            response = requests.request(method, url, timeout=timeout, **kwargs)
+            response.raise_for_status()
+            data = response.json()
             
-        return data 
+            if not data.get("success"):
+                raise ApiError(data.get("message", "Unknown API error"))
+                
+            return data
+        except requests.exceptions.RequestException as e:
+            logger.error("Request failed: %s", str(e))
+            raise ApiError(f"Request failed: {str(e)}") 

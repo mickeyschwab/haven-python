@@ -1,27 +1,50 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, ClassVar
 from .light import Light
+from ..credentials import Credentials
 from ..exceptions import AuthenticationError
 
 class Location:
-    """Represents a Haven location with its associated lights."""
+    """
+    Represents a Haven location with its associated lights.
     
-    def __init__(self, credentials, location_id: int, data: Optional[Dict[str, Any]] = None):
-        self.credentials = credentials
-        self.location_id = location_id
+    Attributes:
+        credentials: Credentials object for API requests
+        location_id: Unique identifier for the location
+        name: Location name
+    """
+    
+    MIN_CAPABILITY_LEVEL: ClassVar[int] = 0
+    
+    def __init__(self, credentials: Credentials, location_id: int, data: Optional[Dict[str, Any]] = None) -> None:
+        self._credentials = credentials
+        self._location_id = location_id
         self._data = data or {}
         self._lights: Dict[int, Light] = {}
         
     @property
     def name(self) -> str:
+        """Get location name."""
         return self._data.get("ownerName", "")
         
     @classmethod
-    def discover(cls, credentials) -> Dict[int, 'Location']:
-        """Discover all locations available to the authenticated user."""
+    def discover(cls, credentials: Credentials) -> Dict[int, 'Location']:
+        """
+        Discover all locations available to the authenticated user.
+        
+        Args:
+            credentials: Authenticated credentials object
+            
+        Returns:
+            Dictionary of location_id to Location objects
+            
+        Raises:
+            AuthenticationError: If not authenticated
+            ApiError: If API request fails
+        """
         response = credentials.make_request(
             "GET",
             "/Location/OrderedLocationV2",
-            params={"minimumCapabilityLevel": 0},
+            params={"minimumCapabilityLevel": cls.MIN_CAPABILITY_LEVEL},
             use_prod_api=True
         )
         
@@ -33,9 +56,9 @@ class Location:
         
     def update(self) -> None:
         """Update location details."""
-        response = self.credentials.make_request(
+        response = self._credentials.make_request(
             "GET", 
-            f"/Location/InformationSummary/{self.location_id}",
+            f"/Location/InformationSummary/{self._location_id}",
             use_prod_api=True
         )
         self._data = response["data"]
@@ -43,17 +66,17 @@ class Location:
     def get_lights(self) -> Dict[int, Light]:
         """Get all lights for this location."""
         if not self._lights:
-            response = self.credentials.make_request(
+            response = self._credentials.make_request(
                 "GET",
                 "/Light/OrderedLightsAndZones",
-                params={"locationId": self.location_id}
+                params={"locationId": self._location_id}
             )
             
             for light_data in response["data"]["lights"]:
                 light_id = int(light_data["lightId"])
                 self._lights[light_id] = Light(
-                    self.credentials,
-                    self.location_id,
+                    self._credentials,
+                    self._location_id,
                     light_id,
                     light_data
                 )
