@@ -1,1 +1,9 @@
-requests
+# Core dependencies
+requests>=2.25.0
+
+# Development dependencies
+pytest>=6.0
+pytest-mock>=3.0
+black>=22.0
+isort>=5.0
+mypy>=0.900
