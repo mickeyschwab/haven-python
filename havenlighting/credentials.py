@@ -1,9 +1,24 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 import requests
+from functools import wraps
 from .exceptions import AuthenticationError, ApiError
 import logging
 
 logger = logging.getLogger(__name__)
+
+def refresh_on_auth_error(func: Callable) -> Callable:
+    """Decorator to refresh token and retry on authentication errors."""
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except AuthenticationError:
+            logger.info("Authentication error, attempting token refresh")
+            if self.refresh_token():
+                logger.info("Token refresh successful, retrying request")
+                return func(self, *args, **kwargs)
+            raise
+    return wrapper
 
 class Credentials:
     """Handles authentication and request credentials."""
@@ -30,22 +45,47 @@ class Credentials:
         }
         
         try:
-            response = self.make_request(
+            response = self._make_request_internal(
                 "POST",
                 "/User/authenticate",
                 json=payload,
-                auth_required=False,
-                use_prod_api=False
+                auth_required=False
             )
-            data = response["data"]
-            self._token = data["token"]
-            self._refresh_token = data["refreshToken"]
-            self._user_id = data["id"]
+            self._update_credentials(response["data"])
             return True
             
         except ApiError:
             return False
             
+    def refresh_token(self) -> bool:
+        """Refresh the authentication token."""
+        if not self._refresh_token or not self._user_id:
+            return False
+            
+        try:
+            response = self._make_request_internal(
+                "POST",
+                "/User/refresh",
+                json={
+                    "refreshToken": self._refresh_token,
+                    "userId": self._user_id
+                },
+                auth_required=False
+            )
+            self._update_credentials(response["data"])
+            return True
+            
+        except ApiError as e:
+            logger.error("Token refresh failed: %s", str(e))
+            return False
+            
+    def _update_credentials(self, data: Dict[str, Any]) -> None:
+        """Update stored credentials from API response."""
+        self._token = data["token"]
+        self._refresh_token = data["refreshToken"]
+        self._user_id = data["id"]
+        
+    @refresh_on_auth_error
     def make_request(
         self, 
         method: str, 
@@ -55,25 +95,21 @@ class Credentials:
         timeout: int = 30,
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        Make an authenticated API request.
+        """Make an authenticated API request with automatic token refresh."""
+        return self._make_request_internal(
+            method, path, auth_required, use_prod_api, timeout, **kwargs
+        )
         
-        Args:
-            method: HTTP method
-            path: API endpoint path
-            auth_required: Whether authentication is required
-            use_prod_api: Whether to use production API base URL
-            timeout: Request timeout in seconds
-            **kwargs: Additional request parameters
-            
-        Returns:
-            Dict containing API response
-            
-        Raises:
-            AuthenticationError: If authentication is required but not authenticated
-            ApiError: If API request fails
-            requests.exceptions.RequestException: If request fails
-        """
+    def _make_request_internal(
+        self, 
+        method: str, 
+        path: str, 
+        auth_required: bool = True,
+        use_prod_api: bool = False,
+        timeout: int = 30,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Internal method for making API requests."""
         if auth_required and not self.is_authenticated:
             raise AuthenticationError("Authentication required")
             
@@ -91,6 +127,8 @@ class Credentials:
             data = response.json()
             
             if not data.get("success"):
+                if "token" in str(data.get("message", "")).lower():
+                    raise AuthenticationError(data.get("message", "Token expired"))
                 raise ApiError(data.get("message", "Unknown API error"))
                 
             return data
