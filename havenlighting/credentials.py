@@ -30,7 +30,7 @@ class Credentials:
     def __init__(self):
         self._token: Optional[str] = None
         self._refresh_token: Optional[str] = None
-        self._user_id: Optional[str] = None
+        self._user_id: Optional[int] = None
         
     @property
     def is_authenticated(self) -> bool:
