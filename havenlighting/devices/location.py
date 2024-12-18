@@ -1,4 +1,5 @@
 from typing import Dict, Any, Optional, ClassVar
+from ..models import LocationData
 from .light import Light
 from ..credentials import Credentials
 from ..exceptions import AuthenticationError
@@ -18,13 +19,17 @@ class Location:
     def __init__(self, credentials: Credentials, location_id: int, data: Optional[Dict[str, Any]] = None) -> None:
         self._credentials = credentials
         self._location_id = location_id
-        self._data = data or {}
+        self._data = LocationData(
+            location_id=location_id,
+            name=data.get("name", ""),
+            owner_name=data.get("ownerName", "")
+        ) if data else None
         self._lights: Dict[int, Light] = {}
         
     @property
     def name(self) -> str:
         """Get location name."""
-        return self._data.get("ownerName", "")
+        return self._data.owner_name if self._data else ""
         
     @classmethod
     def discover(cls, credentials: Credentials) -> Dict[int, 'Location']:

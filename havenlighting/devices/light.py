@@ -1,4 +1,6 @@
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any
+from ..models import LightData
+from ..config import LIGHT_STATE, LIGHT_PARAMS
 from ..credentials import Credentials
 
 class Light:
@@ -6,36 +8,37 @@ class Light:
 
     def __init__(self, credentials: Credentials, location_id: int, light_id: int, data: Dict[str, Any]) -> None:
         self._credentials = credentials
-        self._data = data
         self.location_id = location_id
-        self._id = int(data["lightId"])
-        self._name = data["name"]
-        self._state = False
+        self._data = LightData(
+            light_id=int(data["lightId"]),
+            name=data["name"],
+            status=data.get("lightingStatusId", LIGHT_STATE["OFF"]),
+            brightness=data.get("brightness", LIGHT_PARAMS["BRIGHTNESS"]),
+            color=data.get("color", LIGHT_PARAMS["COLOR"]),
+            pattern_speed=data.get("patternSpeed", LIGHT_PARAMS["PATTERN_SPEED"])
+        )
 
     @property
     def id(self) -> int:
-        """Return light ID."""
-        return self._id
+        return self._data.light_id
 
     @property
     def name(self) -> str:
-        """Return light name."""
-        return self._name
+        return self._data.name
 
     @property
     def is_on(self) -> bool:
-        """Return True if light is on."""
-        return self._state
+        return self._data.status == LIGHT_STATE["ON"]
 
     def turn_on(self) -> None:
         """Turn the light on."""
         self._send_command(2)  # 2 = ON state
-        self._state = True
+        self._data.status = LIGHT_STATE["ON"]
 
     def turn_off(self) -> None:
         """Turn the light off."""
         self._send_command(1)  # 1 = OFF state
-        self._state = False
+        self._data.status = LIGHT_STATE["OFF"]
         
     def _send_command(self, status_id: int) -> None:
         """Send a command to the light."""
