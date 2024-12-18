@@ -1,7 +1,10 @@
 from typing import Dict, Any
+import logging
 from ..models import LightData
 from ..config import LIGHT_STATE, LIGHT_PARAMS
 from ..credentials import Credentials
+
+logger = logging.getLogger(__name__)
 
 class Light:
     """Represents a Haven light device."""
@@ -17,6 +20,7 @@ class Light:
             color=data.get("color", LIGHT_PARAMS["COLOR"]),
             pattern_speed=data.get("patternSpeed", LIGHT_PARAMS["PATTERN_SPEED"])
         )
+        logger.debug("Initialized Light: %s (ID: %d)", self.name, self.id)
 
     @property
     def id(self) -> int:
@@ -32,13 +36,25 @@ class Light:
 
     def turn_on(self) -> None:
         """Turn the light on."""
-        self._send_command(LIGHT_STATE["ON"])
-        self._data.status = LIGHT_STATE["ON"]
+        logger.debug("Turning on light: %s (ID: %d)", self.name, self.id)
+        try:
+            self._send_command(LIGHT_STATE["ON"])
+            self._data.status = LIGHT_STATE["ON"]
+            logger.info("Light turned on successfully: %s", self.name)
+        except Exception as e:
+            logger.error("Failed to turn on light %s: %s", self.name, str(e))
+            raise
 
     def turn_off(self) -> None:
         """Turn the light off."""
-        self._send_command(LIGHT_STATE["OFF"])
-        self._data.status = LIGHT_STATE["OFF"]
+        logger.debug("Turning off light: %s (ID: %d)", self.name, self.id)
+        try:
+            self._send_command(LIGHT_STATE["OFF"])
+            self._data.status = LIGHT_STATE["OFF"]
+            logger.info("Light turned off successfully: %s", self.name)
+        except Exception as e:
+            logger.error("Failed to turn off light %s: %s", self.name, str(e))
+            raise
         
     def _send_command(self, status_id: int) -> None:
         """Send a command to the light."""

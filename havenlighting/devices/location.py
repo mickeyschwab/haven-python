@@ -1,8 +1,11 @@
 from typing import Dict, Any, Optional, ClassVar
+import logging
 from ..models import LocationData
 from .light import Light
 from ..credentials import Credentials
 from ..exceptions import AuthenticationError
+
+logger = logging.getLogger(__name__)
 
 class Location:
     """
@@ -25,6 +28,7 @@ class Location:
             owner_name=data.get("ownerName", "")
         ) if data else None
         self._lights: Dict[int, Light] = {}
+        logger.debug("Initialized Location: %s (ID: %d)", self.name, location_id)
         
     @property
     def name(self) -> str:
@@ -70,20 +74,27 @@ class Location:
 
     def get_lights(self) -> Dict[int, Light]:
         """Get all lights for this location."""
+        logger.debug("Fetching lights for location: %s (ID: %d)", self.name, self._location_id)
+        
         if not self._lights:
-            response = self._credentials.make_request(
-                "GET",
-                "/Light/OrderedLightsAndZones",
-                params={"locationId": self._location_id}
-            )
-            
-            for light_data in response["data"]["lights"]:
-                light_id = int(light_data["lightId"])
-                self._lights[light_id] = Light(
-                    self._credentials,
-                    self._location_id,
-                    light_id,
-                    light_data
+            try:
+                response = self._credentials.make_request(
+                    "GET",
+                    "/Light/OrderedLightsAndZones",
+                    params={"locationId": self._location_id}
                 )
+                
+                for light_data in response["data"]["lights"]:
+                    light_id = int(light_data["lightId"])
+                    self._lights[light_id] = Light(
+                        self._credentials,
+                        self._location_id,
+                        light_id,
+                        light_data
+                    )
+                logger.info("Found %d lights for location: %s", len(self._lights), self.name)
+            except Exception as e:
+                logger.error("Failed to fetch lights for location %d: %s", self._location_id, str(e))
+                raise
                 
         return self._lights

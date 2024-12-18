@@ -4,14 +4,23 @@ from .credentials import Credentials
 from .devices.light import Light
 from .devices.location import Location
 from .exceptions import AuthenticationError, ApiError
+from .logging import setup_logging
 
 logger = logging.getLogger(__name__)
 
 class HavenClient:
     """Main client for interacting with Haven Lighting devices."""
     
-    def __init__(self) -> None:
-        self._credentials: Optional[Credentials] = None
+    def __init__(self, log_level: int = logging.INFO, log_file: Optional[str] = None) -> None:
+        """
+        Initialize the Haven Lighting client.
+        
+        Args:
+            log_level: Logging level (default: INFO)
+            log_file: Optional file path for logging output
+        """
+        setup_logging(log_level, log_file)
+        self._credentials = Credentials()
         self._locations: Dict[int, Location] = {}
         self._lights: Dict[int, Light] = {}
         logger.debug("Initialized HavenClient")
@@ -31,7 +40,6 @@ class HavenClient:
             ApiError: If API request fails
         """
         try:
-            self._credentials = Credentials()
             authenticated = self._credentials.authenticate(email, password)
             if authenticated:
                 logger.info("Successfully authenticated user: %s", email)

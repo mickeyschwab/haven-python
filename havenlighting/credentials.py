@@ -18,6 +18,7 @@ def refresh_on_auth_error(func: Callable) -> Callable:
             if self.refresh_token():
                 logger.info("Token refresh successful, retrying request")
                 return func(self, *args, **kwargs)
+            logger.error("Token refresh failed, unable to retry request")
             raise
     return wrapper
 
@@ -28,6 +29,7 @@ class Credentials:
         self._token: Optional[str] = None
         self._refresh_token: Optional[str] = None
         self._user_id: Optional[int] = None
+        logger.debug("Initialized Credentials")
         
     @property
     def is_authenticated(self) -> bool:
@@ -35,6 +37,7 @@ class Credentials:
         
     def authenticate(self, email: str, password: str) -> bool:
         """Authenticate with the Haven Lighting service."""
+        logger.debug("Attempting authentication for user: %s", email)
         payload = {
             "email": email,
             "password": password,
@@ -48,10 +51,15 @@ class Credentials:
                 json=payload,
                 auth_required=False
             )
+            if not response["success"] or not response["data"]:
+                logger.error("Authentication failed for user %s: %s", email, response["message"])
+                return False
             self._update_credentials(response["data"])
+            logger.info("Successfully authenticated user: %s", email)
             return True
             
-        except ApiError:
+        except ApiError as e:
+            logger.error("Authentication failed for user %s: %s", email, str(e))
             return False
             
     def refresh_token(self) -> bool:

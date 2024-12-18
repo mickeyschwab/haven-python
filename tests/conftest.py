@@ -9,19 +9,20 @@ def client():
 @pytest.fixture
 def authenticated_client(client, mocker):
     # Create credentials first
-    client._credentials = Credentials()
+    credentials = Credentials()
     
     # Mock successful authentication
-    mock_auth = mocker.patch.object(client._credentials, 'make_request')
+    mock_auth = mocker.patch.object(credentials, '_make_request_internal')
     mock_auth.return_value = {
         "success": True,
         "data": {
             "token": "test_token",
             "refreshToken": "test_refresh_token",
-            "id": "test_user_id"
+            "id": 123
         }
     }
     
+    client._credentials = credentials
     client.authenticate("test@example.com", "test_password")
     return client
 
@@ -31,7 +32,7 @@ def mock_location_response():
         "success": True,
         "data": [
             {
-                "locationId": "1",
+                "locationId": 123,
                 "ownerName": "Test Location",
                 "name": "Test Location"
             }
@@ -45,7 +46,7 @@ def mock_lights_response():
         "data": {
             "lights": [
                 {
-                    "lightId": "1",
+                    "lightId": 456,
                     "name": "Test Light",
                     "lightingStatusId": 1
                 }

@@ -1,29 +1,34 @@
 import pytest
+
 from havenlighting import HavenClient
+from havenlighting.config import DEVICE_ID
 from havenlighting.credentials import Credentials
 from havenlighting.exceptions import AuthenticationError, DeviceError
 
+
 def test_client_initialization():
     client = HavenClient()
-    assert client._credentials is None
+    assert isinstance(client._credentials, Credentials)
+    assert not client._credentials.is_authenticated
     assert client._locations == {}
     assert client._lights == {}
 
 def test_authentication_success(client, mocker):
     # Create credentials first
-    client._credentials = Credentials()
+    credentials = Credentials()
     
-    # Mock the credentials make_request method
-    mock_request = mocker.patch.object(client._credentials, 'make_request')
+    # Mock the internal request method
+    mock_request = mocker.patch.object(credentials, '_make_request_internal')
     mock_request.return_value = {
         "success": True,
         "data": {
             "token": "test_token",
             "refreshToken": "test_refresh_token",
-            "id": "test_user_id"
+            "id": 123
         }
     }
     
+    client._credentials = credentials
     assert client.authenticate("test@example.com", "password")
     assert client._credentials.is_authenticated
     mock_request.assert_called_once_with(
@@ -32,22 +37,26 @@ def test_authentication_success(client, mocker):
         json={
             "email": "test@example.com",
             "password": "password",
-            "deviceId": "HavenLightingMobile"
+            "deviceId": DEVICE_ID
         },
-        auth_required=False,
-        use_prod_api=False
+        auth_required=False
     )
 
 def test_authentication_failure(client, mocker):
     # Create credentials first
-    client._credentials = Credentials()
+    credentials = Credentials()
     
     # Mock failed authentication
-    mock_request = mocker.patch.object(client._credentials, 'make_request')
+    mock_request = mocker.patch.object(credentials, '_make_request_internal')
     mock_request.return_value = {
         "success": False,
-        "message": "Invalid credentials"
+        "returnCode": 600,
+        "severityLevel": 1,
+        "message": "Password is incorrect",
+        "data": None
     }
+
+    client._credentials = credentials
     
     assert not client.authenticate("test@example.com", "wrong_password")
     assert not client._credentials.is_authenticated
