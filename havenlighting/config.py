@@ -19,6 +19,7 @@ LIGHT_PARAMS: Final[dict] = {
     "PATTERN_SPEED": 63
 }
 
-# API Base URLs
+# API Configuration
+DEVICE_ID: Final[str] = "HavenLightingMobile"
 AUTH_API_BASE: Final[str] = "https://havenwebservices-apiapp-test.azurewebsites.net/api/v2"
 PROD_API_BASE: Final[str] = "https://ase-hvnlght-residential-api-prod.azurewebsites.net/api" 

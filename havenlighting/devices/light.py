@@ -32,12 +32,12 @@ class Light:
 
     def turn_on(self) -> None:
         """Turn the light on."""
-        self._send_command(2)  # 2 = ON state
+        self._send_command(LIGHT_STATE["ON"])
         self._data.status = LIGHT_STATE["ON"]
 
     def turn_off(self) -> None:
         """Turn the light off."""
-        self._send_command(1)  # 1 = OFF state
+        self._send_command(LIGHT_STATE["OFF"])
         self._data.status = LIGHT_STATE["OFF"]
         
     def _send_command(self, status_id: int) -> None:
@@ -48,9 +48,9 @@ class Light:
             params={"locationId": self.location_id},
             json={
                 "lightingStatusId": status_id,
-                "lightBrightnessId": 63,
-                "lightColorId": 63,
-                "patternSpeedId": 63,
+                "lightBrightnessId": LIGHT_PARAMS["BRIGHTNESS"],
+                "lightColorId": LIGHT_PARAMS["COLOR"],
+                "patternSpeedId": LIGHT_PARAMS["PATTERN_SPEED"],
                 "selectedLightIds": [self.id],
                 "locationId": self.location_id
             }

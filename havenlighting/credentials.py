@@ -3,6 +3,7 @@ import requests
 from functools import wraps
 from .exceptions import AuthenticationError, ApiError
 import logging
+from .config import DEVICE_ID, AUTH_API_BASE, PROD_API_BASE, API_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +24,6 @@ def refresh_on_auth_error(func: Callable) -> Callable:
 class Credentials:
     """Handles authentication and request credentials."""
     
-    DEVICE_ID = "HavenLightingMobile"
-    AUTH_API_BASE = "https://havenwebservices-apiapp-test.azurewebsites.net/api/v2"
-    PROD_API_BASE = "https://ase-hvnlght-residential-api-prod.azurewebsites.net/api"
-    
     def __init__(self):
         self._token: Optional[str] = None
         self._refresh_token: Optional[str] = None
@@ -41,7 +38,7 @@ class Credentials:
         payload = {
             "email": email,
             "password": password,
-            "deviceId": self.DEVICE_ID,
+            "deviceId": DEVICE_ID,
         }
         
         try:
@@ -92,7 +89,7 @@ class Credentials:
         path: str, 
         auth_required: bool = True,
         use_prod_api: bool = False,
-        timeout: int = 30,
+        timeout: int = API_TIMEOUT,
         **kwargs
     ) -> Dict[str, Any]:
         """Make an authenticated API request with automatic token refresh."""
@@ -106,14 +103,14 @@ class Credentials:
         path: str, 
         auth_required: bool = True,
         use_prod_api: bool = False,
-        timeout: int = 30,
+        timeout: int = API_TIMEOUT,
         **kwargs
     ) -> Dict[str, Any]:
         """Internal method for making API requests."""
         if auth_required and not self.is_authenticated:
             raise AuthenticationError("Authentication required")
             
-        base_url = self.PROD_API_BASE if use_prod_api else self.AUTH_API_BASE
+        base_url = PROD_API_BASE if use_prod_api else AUTH_API_BASE
         url = f"{base_url}{path}"
         
         if self._token:
