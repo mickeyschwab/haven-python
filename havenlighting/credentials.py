@@ -132,7 +132,7 @@ class Credentials:
             data = response.json()
             
             if not data.get("success"):
-                if "token" in str(data.get("message", "")).lower():
+                if response.status_code == 401:
                     raise AuthenticationError(data.get("message", "Token expired"))
                 raise ApiError(data.get("message", "Unknown API error"))
                 

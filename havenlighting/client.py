@@ -50,16 +50,6 @@ class HavenClient:
             logger.error("API error during authentication: %s", str(e))
             raise
 
-    def get_location(self, location_id: int) -> Location:
-        """Get a location by ID."""
-        if not self._credentials:
-            raise AuthenticationError("Not authenticated")
-            
-        if location_id not in self._locations:
-            self._locations[location_id] = Location(self._credentials, location_id)
-        
-        return self._locations[location_id]
-
     def discover_locations(self) -> Dict[int, Location]:
         """Discover all available locations."""
         if not self._credentials:
