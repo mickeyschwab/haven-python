@@ -112,7 +112,7 @@ class Credentials:
         auth_required: bool = True,
         use_prod_api: bool = False,
         timeout: int = API_TIMEOUT,
-        **kwargs
+        **kwargs: Any
     ) -> Dict[str, Any]:
         """Internal method for making API requests."""
         if auth_required and not self.is_authenticated:

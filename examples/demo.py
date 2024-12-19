@@ -1,14 +1,22 @@
 import time
+import logging
+import os
 from havenlighting import HavenClient
 
 def main():
-    client = HavenClient()
+    # Initialize client with debug logging
+    client = HavenClient(log_level=logging.DEBUG)
+    
+    # Get credentials from environment variables
+    email = os.getenv("HAVEN_EMAIL")
+    password = os.getenv("HAVEN_PASSWORD")
+    
+    if not email or not password:
+        print("Please set HAVEN_EMAIL and HAVEN_PASSWORD environment variables")
+        return
     
     # Authenticate
-    authenticated = client.authenticate(
-        email="your-email@example.com",
-        password="your-password"
-    )
+    authenticated = client.authenticate(email=email, password=password)
     
     if not authenticated:
         print("Authentication failed")
