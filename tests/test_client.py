@@ -74,3 +74,44 @@ def test_discover_locations(authenticated_client, mock_location_response, mocker
 def test_discover_locations_unauthenticated(client):
     with pytest.raises(AuthenticationError):
         client.discover_locations() 
+
+def test_token_refresh(client, mocker):
+    credentials = Credentials()
+    
+    # Mock initial authentication
+    mock_auth = mocker.patch.object(credentials, '_make_request_internal')
+    mock_auth.return_value = {
+        "success": True,
+        "data": {
+            "token": "initial_token",
+            "refreshToken": "test_refresh_token",
+            "id": 123
+        }
+    }
+    
+    client._credentials = credentials
+    client.authenticate("test@example.com", "password")
+    
+    # Mock a 401 followed by successful refresh
+    mock_request = mocker.patch.object(credentials, '_make_request_internal')
+    mock_request.side_effect = [
+        AuthenticationError("Token expired"),  # First call fails
+        {  # Refresh token call succeeds
+            "success": True,
+            "data": {
+                "token": "new_token",
+                "refreshToken": "new_refresh_token",
+                "id": 123
+            }
+        },
+        {  # Original request succeeds with new token
+            "success": True,
+            "data": {"test": "data"}
+        }
+    ]
+    
+    # This should trigger the refresh flow
+    result = client._credentials.make_request("GET", "/test/endpoint")
+    
+    assert result == {"success": True, "data": {"test": "data"}}
+    assert mock_request.call_count == 3  # Original request + refresh + retry

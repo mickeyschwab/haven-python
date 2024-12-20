@@ -19,7 +19,7 @@ def refresh_on_auth_error(func: Callable) -> Callable:
                 logger.info("Token refresh successful, retrying request")
                 return func(self, *args, **kwargs)
             logger.error("Token refresh failed, unable to retry request")
-            raise
+            raise AuthenticationError("Token refresh failed")
     return wrapper
 
 class Credentials:
@@ -65,9 +65,11 @@ class Credentials:
     def refresh_token(self) -> bool:
         """Refresh the authentication token."""
         if not self._refresh_token or not self._user_id:
+            logger.debug("Cannot refresh token - missing refresh token or user ID")
             return False
-            
+        
         try:
+            logger.debug("Attempting token refresh for user ID: %s", self._user_id)
             response = self._make_request_internal(
                 "POST",
                 "/User/refresh",
@@ -77,7 +79,13 @@ class Credentials:
                 },
                 auth_required=False
             )
+            old_token = self._token
             self._update_credentials(response["data"])
+            logger.debug("Token refresh successful - Old token: %s...%s, New token: %s...%s", 
+                        old_token[:5] if old_token else "None", 
+                        old_token[-5:] if old_token else "None",
+                        self._token[:5], 
+                        self._token[-5:])
             return True
             
         except ApiError as e:
@@ -98,11 +106,16 @@ class Credentials:
         auth_required: bool = True,
         use_prod_api: bool = False,
         timeout: int = API_TIMEOUT,
-        **kwargs
+        **kwargs: Any
     ) -> Dict[str, Any]:
         """Make an authenticated API request with automatic token refresh."""
         return self._make_request_internal(
-            method, path, auth_required, use_prod_api, timeout, **kwargs
+            method=method, 
+            path=path, 
+            auth_required=auth_required,
+            use_prod_api=use_prod_api,
+            timeout=timeout,
+            **kwargs
         )
         
     def _make_request_internal(

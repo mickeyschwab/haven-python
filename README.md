@@ -44,12 +44,16 @@ if authenticated:
 ## Development
 
 1. Clone the repository
-2. Install development dependencies:
+2. Copy .env.example to .env and fill in your credentials:
+```bash
+cp .env.example .env
+```
+3. Install development dependencies:
 ```bash
 pip install -e ".[dev]"
 ```
 
-3. Run tests:
+4. Run tests:
 ```bash
 pytest
 ```
