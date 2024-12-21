@@ -141,7 +141,7 @@ class Credentials:
         try:
             response = requests.request(method, url, timeout=timeout, **kwargs)
             if response.status_code == 401:
-                raise AuthenticationError(data.get("message", "Token expired"))
+                raise AuthenticationError("Received 401 Unauthorized response")
             response.raise_for_status()
             data = response.json()
             
