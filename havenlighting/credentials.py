@@ -7,21 +7,6 @@ from .config import DEVICE_ID, AUTH_API_BASE, PROD_API_BASE, API_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
-def refresh_on_auth_error(func: Callable) -> Callable:
-    """Decorator to refresh token and retry on authentication errors."""
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        try:
-            return func(self, *args, **kwargs)
-        except AuthenticationError:
-            logger.info("Authentication error, attempting token refresh")
-            if self.refresh_token():
-                logger.info("Token refresh successful, retrying request")
-                return func(self, *args, **kwargs)
-            logger.error("Token refresh failed, unable to retry request")
-            raise AuthenticationError("Token refresh failed")
-    return wrapper
-
 class Credentials:
     """Handles authentication and request credentials."""
     
@@ -98,7 +83,6 @@ class Credentials:
         self._refresh_token = data["refreshToken"]
         self._user_id = data["id"]
         
-    @refresh_on_auth_error
     def make_request(
         self, 
         method: str, 
@@ -109,14 +93,29 @@ class Credentials:
         **kwargs: Any
     ) -> Dict[str, Any]:
         """Make an authenticated API request with automatic token refresh."""
-        return self._make_request_internal(
-            method=method, 
-            path=path, 
-            auth_required=auth_required,
-            use_prod_api=use_prod_api,
-            timeout=timeout,
-            **kwargs
-        )
+        try:
+            return self._make_request_internal(
+                method=method, 
+                path=path, 
+                auth_required=auth_required,
+                use_prod_api=use_prod_api,
+                timeout=timeout,
+                **kwargs
+            )
+        except AuthenticationError:
+            logger.info("Authentication error, attempting token refresh")
+            if self.refresh_token():
+                logger.info("Token refresh successful, retrying request")
+                return self._make_request_internal(
+                    method=method, 
+                    path=path, 
+                    auth_required=auth_required,
+                    use_prod_api=use_prod_api,
+                    timeout=timeout,
+                    **kwargs
+                )
+            logger.error("Token refresh failed, unable to retry request")
+            raise AuthenticationError("Token refresh failed")
         
     def _make_request_internal(
         self, 
@@ -152,4 +151,4 @@ class Credentials:
             return data
         except requests.exceptions.RequestException as e:
             logger.error("Request failed: %s", str(e))
-            raise ApiError(f"Request failed: {str(e)}") 
+            raise ApiError(f"Request failed: {str(e)}")
