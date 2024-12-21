@@ -140,15 +140,15 @@ class Credentials:
             
         try:
             response = requests.request(method, url, timeout=timeout, **kwargs)
+            if response.status_code == 401:
+                raise AuthenticationError(data.get("message", "Token expired"))
             response.raise_for_status()
             data = response.json()
             
-            if not data.get("success"):
-                if response.status_code == 401:
-                    raise AuthenticationError(data.get("message", "Token expired"))
+            if not response.ok or not data.get("success"):
                 raise ApiError(data.get("message", "Unknown API error"))
                 
             return data
         except requests.exceptions.RequestException as e:
             logger.error("Request failed: %s", str(e))
-            raise ApiError(f"Request failed: {str(e)}")
+            raise ApiError("Request failed: %s", str(e))
