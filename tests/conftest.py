@@ -10,18 +10,17 @@ def client():
 def authenticated_client(client, mocker):
     # Create credentials first
     credentials = Credentials()
-    
+
     # Mock successful authentication
     mock_auth = mocker.patch.object(credentials, '_make_request_internal')
     mock_auth.return_value = {
-        "success": True,
-        "data": {
-            "token": "test_token",
-            "refreshToken": "test_refresh_token",
-            "id": 123
-        }
+        "id": 123,
+        "username": "test@example.com",
+        "token": "test_token",
+        "refreshToken": "test_refresh_token",
+        "userType": 1
     }
-    
+
     client._credentials = credentials
     client.authenticate("test@example.com", "test_password")
     return client
@@ -29,27 +28,26 @@ def authenticated_client(client, mocker):
 @pytest.fixture
 def mock_location_response():
     return {
-        "success": True,
-        "data": [
-            {
-                "locationId": 123,
-                "ownerName": "Test Location",
-                "name": "Test Location"
-            }
-        ]
+        "userId": 123,
+        "email": "test@example.com",
+        "firstName": "Test",
+        "lastName": "Location",
+        "defaultLocationId": 123,
     }
 
 @pytest.fixture
 def mock_lights_response():
     return {
-        "success": True,
-        "data": {
-            "lights": [
-                {
-                    "lightId": 456,
-                    "name": "Test Light",
-                    "lightingStatusId": 1
-                }
-            ]
-        }
-    } 
+        "locationId": 123,
+        "name": "Test Location",
+        "lights": [
+            {
+                "lightId": 456,
+                "name": "Test Light",
+                "lightingStatusId": 1,
+                "lightBrightnessId": 10,
+                "colorId": 11,
+                "patternSpeedId": 0,
+            }
+        ],
+    }

@@ -1,104 +1,105 @@
-from typing import Dict, Any, Optional, Callable
-import requests
-from functools import wraps
-from .exceptions import AuthenticationError, ApiError
+from typing import Any, Dict, Optional
+from curl_cffi import requests
+from curl_cffi.requests.exceptions import RequestException
 import logging
-from .config import DEVICE_ID, AUTH_API_BASE, PROD_API_BASE, API_TIMEOUT
+from .exceptions import AuthenticationError, ApiError
+from .config import API_BASE, API_TIMEOUT, APP_SOURCE, APP_VERSION
 
 logger = logging.getLogger(__name__)
 
 class Credentials:
     """Handles authentication and request credentials."""
-    
+
     def __init__(self):
         self._token: Optional[str] = None
         self._refresh_token: Optional[str] = None
         self._user_id: Optional[int] = None
+        # impersonate="chrome": Haven's Azure Front Door WAF blocks the TLS
+        # fingerprint of plain requests/urllib3 (403 "request is blocked",
+        # verified against real headers/UA too) but passes curl and browser
+        # fingerprints. A Session (vs. a fresh request each call) also avoids
+        # re-negotiating that fingerprint/TLS handshake on every API call.
+        self._session = requests.Session(impersonate="chrome")
         logger.debug("Initialized Credentials")
-        
+
     @property
     def is_authenticated(self) -> bool:
         return bool(self._token and self._user_id)
-        
+
     def authenticate(self, email: str, password: str) -> bool:
         """Authenticate with the Haven Lighting service."""
         logger.debug("Attempting authentication for user: %s", email)
         payload = {
-            "email": email,
+            "username": email,
             "password": password,
-            "deviceId": DEVICE_ID,
         }
-        
+
         try:
             response = self._make_request_internal(
                 "POST",
-                "/User/authenticate",
+                "/Auth/authenticate",
                 json=payload,
                 auth_required=False
             )
-            if not response["success"] or not response["data"]:
-                logger.error("Authentication failed for user %s: %s", email, response["message"])
+            if not response.get("token"):
+                logger.error("Authentication failed for user %s: no token in response", email)
                 return False
-            self._update_credentials(response["data"])
+            self._update_credentials(response)
             logger.info("Successfully authenticated user: %s", email)
             return True
-            
+
         except ApiError as e:
             logger.error("Authentication failed for user %s: %s", email, str(e))
             return False
-            
+
     def refresh_token(self) -> bool:
         """Refresh the authentication token."""
         if not self._refresh_token or not self._user_id:
             logger.debug("Cannot refresh token - missing refresh token or user ID")
             return False
-        
+
         try:
             logger.debug("Attempting token refresh for user ID: %s", self._user_id)
             response = self._make_request_internal(
                 "POST",
-                "/User/refresh",
+                "/Auth/refresh",
                 json={
                     "refreshToken": self._refresh_token,
                     "userId": self._user_id
                 },
                 auth_required=False
             )
-            old_token = self._token
-            self._update_credentials(response["data"])
-            logger.debug("Token refresh successful - Old token: %s...%s, New token: %s...%s", 
-                        old_token[:5] if old_token else "None", 
-                        old_token[-5:] if old_token else "None",
-                        self._token[:5], 
-                        self._token[-5:])
+            self._update_credentials(response)
+            logger.info("Token refresh successful")
             return True
-            
+
         except ApiError as e:
             logger.error("Token refresh failed: %s", str(e))
             return False
-            
+
     def _update_credentials(self, data: Dict[str, Any]) -> None:
         """Update stored credentials from API response."""
-        self._token = data["token"]
-        self._refresh_token = data["refreshToken"]
-        self._user_id = data["id"]
-        
+        try:
+            self._token = data["token"]
+            self._refresh_token = data["refreshToken"]
+            self._user_id = data["id"]
+        except KeyError as e:
+            raise ApiError(f"Auth response missing expected field: {e}")
+
     def make_request(
-        self, 
-        method: str, 
-        path: str, 
+        self,
+        method: str,
+        path: str,
         auth_required: bool = True,
-        use_prod_api: bool = False,
         timeout: int = API_TIMEOUT,
         **kwargs: Any
-    ) -> Dict[str, Any]:
+    ) -> Any:
         """Make an authenticated API request with automatic token refresh."""
         try:
             return self._make_request_internal(
-                method=method, 
-                path=path, 
+                method=method,
+                path=path,
                 auth_required=auth_required,
-                use_prod_api=use_prod_api,
                 timeout=timeout,
                 **kwargs
             )
@@ -107,48 +108,70 @@ class Credentials:
             if self.refresh_token():
                 logger.info("Token refresh successful, retrying request")
                 return self._make_request_internal(
-                    method=method, 
-                    path=path, 
+                    method=method,
+                    path=path,
                     auth_required=auth_required,
-                    use_prod_api=use_prod_api,
                     timeout=timeout,
                     **kwargs
                 )
             logger.error("Token refresh failed, unable to retry request")
             raise AuthenticationError("Token refresh failed")
-        
+
     def _make_request_internal(
-        self, 
-        method: str, 
-        path: str, 
+        self,
+        method: str,
+        path: str,
         auth_required: bool = True,
-        use_prod_api: bool = False,
         timeout: int = API_TIMEOUT,
         **kwargs: Any
-    ) -> Dict[str, Any]:
+    ) -> Any:
         """Internal method for making API requests."""
         if auth_required and not self.is_authenticated:
             raise AuthenticationError("Authentication required")
-            
-        base_url = PROD_API_BASE if use_prod_api else AUTH_API_BASE
-        url = f"{base_url}{path}"
-        
+
+        url = f"{API_BASE}{path}"
+
+        headers = kwargs.pop("headers", {})
+        headers.setdefault("Accept", "application/json")
+        headers["app-haven-source"] = APP_SOURCE
+        headers["app-haven-version"] = APP_VERSION
         if self._token:
-            headers = kwargs.pop("headers", {})
             headers["Authorization"] = f"Bearer {self._token}"
-            kwargs["headers"] = headers
-            
+        kwargs["headers"] = headers
+
         try:
-            response = requests.request(method, url, timeout=timeout, **kwargs)
-            if response.status_code == 401:
-                raise AuthenticationError("Received 401 Unauthorized response")
-            response.raise_for_status()
-            data = response.json()
-            
-            if not response.ok or not data.get("success"):
-                raise ApiError(data.get("message", "Unknown API error"))
-                
-            return data
-        except requests.exceptions.RequestException as e:
+            response = self._session.request(method, url, timeout=timeout, **kwargs)
+        except RequestException as e:
             logger.error("Request failed: %s", str(e))
-            raise ApiError("Request failed: %s", str(e))
+            raise ApiError(f"Request failed: {str(e)}")
+
+        if response.status_code == 401:
+            raise AuthenticationError("Received 401 Unauthorized response")
+
+        if not response.ok:
+            raise ApiError(self._extract_error_message(response), code=response.status_code)
+
+        if not response.content:
+            return {}
+
+        return response.json()
+
+    @staticmethod
+    def _extract_error_message(response: Any) -> str:
+        """Build an error message from an application/problem+json body, if present."""
+        try:
+            error_data = response.json()
+        except ValueError:
+            return response.text
+
+        message = error_data.get("title") or error_data.get("message") or response.text
+
+        # ASP.NET validation errors: {"errors": {"Field": ["reason", ...]}}
+        errors = error_data.get("errors")
+        if isinstance(errors, dict) and errors:
+            detail = "; ".join(
+                f"{field}: {', '.join(reasons)}" for field, reasons in errors.items()
+            )
+            message = f"{message}: {detail}" if message else detail
+
+        return message

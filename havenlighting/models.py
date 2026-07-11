@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 
 @dataclass
 class LightData:
@@ -7,7 +6,7 @@ class LightData:
     light_id: int
     name: str
     status: int
-    brightness: int = 63
+    brightness: int = 10
     color: int = 63
     pattern_speed: int = 63
 
@@ -15,5 +14,4 @@ class LightData:
 class LocationData:
     """Data model for location attributes."""
     location_id: int
-    name: str
-    owner_name: Optional[str] = None 
+    name: str 

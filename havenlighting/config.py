@@ -4,7 +4,6 @@ from typing import Final
 
 # API Configuration
 API_TIMEOUT: Final[int] = 30
-MAX_RETRIES: Final[int] = 3
 
 # Light States
 LIGHT_STATE: Final[dict] = {
@@ -12,14 +11,14 @@ LIGHT_STATE: Final[dict] = {
     "ON": 2
 }
 
-# Default Light Parameters
+# Default Light Parameters (brightness is 0-10 on Haven's scale)
 LIGHT_PARAMS: Final[dict] = {
-    "BRIGHTNESS": 63,
+    "BRIGHTNESS": 10,
     "COLOR": 63,
     "PATTERN_SPEED": 63
 }
 
 # API Configuration
-DEVICE_ID: Final[str] = "HavenLightingMobile"
-AUTH_API_BASE: Final[str] = "https://havenwebservices-apiapp-test.azurewebsites.net/api/v2"
-PROD_API_BASE: Final[str] = "https://ase-hvnlght-residential-api-prod.azurewebsites.net/api" 
+API_BASE: Final[str] = "https://stg-api.havenlighting.com/api"
+APP_SOURCE: Final[str] = "REACT_NATIVE"
+APP_VERSION: Final[str] = "1.6" 
