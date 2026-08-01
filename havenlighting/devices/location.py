@@ -28,6 +28,11 @@ class Location:
         logger.debug("Initialized Location: %s (ID: %d)", self.name, location_id)
 
     @property
+    def id(self) -> int:
+        """Get location ID."""
+        return self._location_id
+
+    @property
     def name(self) -> str:
         """Get location name."""
         return self._data.name if self._data else ""

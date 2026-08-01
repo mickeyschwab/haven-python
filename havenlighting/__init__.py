@@ -3,7 +3,7 @@ from .devices.light import Light
 from .devices.location import Location
 from .exceptions import HavenException, AuthenticationError, DeviceError
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __all__ = [
     "HavenClient",
     "Light",
